@@ -7,30 +7,28 @@ import pandas as pd
 # pylint: disable=anomalous-backslash-in-string
 
 # SOP specific parameters
-# - Match 4 digits at start -> 0 or 1 characters -> 0 or 1 spaces
-# --> a hyphen
-# --> any character except \n
-SOP_REGEX = "^(\d{4}\w?\s?)[-](.)+"
-SOP_PATH = "P:\SOPs\ALL Files"
+# - Match files with a 4 digit code and possibly a character and/or space before a hyphen
+SOP_REGEX = r"^(\d{4}\w?\s?)[-](.)+"
+SOP_PATH = "P:\SCRIPTS\ALL Files"
 
 
 def sop_search(search_regex, search_path):
     """Search and parses SOP folder"""
     sops = []
 
-    for path in Path(search_path).rglob("*"):
+    for path in Path(search_path).rglob("*.docx"):
         if (
             re.search(search_regex, path.name)
             and "Archive" not in path.parts
             and Path.is_file(path)
         ):
             department = path.parts[3].split("-")[1].strip()
-            number = re.findall("^\d{4}\w?", path.name)[0]
+            number = re.findall(r"^\d{4}\w?", path.name)[0]
             title = path.stem.split("-")[1].strip()
-            hyperlink = '=HYPERLINK("%s", "%s")' % (path, path)
+            hyperlink = f'=HYPERLINK("{path}", "{path}")'
 
             # Last Revision Date
-            date = None
+            last_revision_date = None
             if path.suffix == ".docx":
                 try:
                     document = Document(path)
@@ -41,12 +39,12 @@ def sop_search(search_regex, search_path):
                                 for para in cell.paragraphs:
                                     # Matches dates in formats like M/D/YY, MM/DD/YYYY, and some permutations
                                     if re.search(
-                                        "^(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/]((19|20)\d{2}|\d{2})$",
+                                        r"^(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/]((19|20)\d{2}|\d{2})$",
                                         para.text.strip(),
                                     ):
                                         # The last date in the last table *appears* to be the most reliable way of getting last revision
                                         # This is the sketchiest part of the whole thing 😬
-                                        date = para.text
+                                        last_revision_date = para.text
                 except IOError:
                     print("Could not open file")
 
@@ -55,7 +53,7 @@ def sop_search(search_regex, search_path):
                 "Number": number,
                 "File Name/Title": title,
                 "Link to documents": hyperlink,
-                "Last Revision Date": date,
+                "Last Revision Date": last_revision_date,
             }
 
             sops.append(row)
