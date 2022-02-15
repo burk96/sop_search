@@ -1,16 +1,13 @@
 from pathlib import Path
-import regex as re
 import datetime as dt
+import regex as re
 from docx import Document
 import pandas as pd
 
-# Between regex and paths, pylint sees too many issues with this script
-# pylint: disable=anomalous-backslash-in-string
-
 # SOP specific parameters
-# - Match files with a 4 digit code and possibly a character and/or space before a hyphen
+# Match files with a 4 digit code and possibly a character and/or space before a hyphen
 SOP_REGEX = r"^(\d{4}\w?\s?)[-](.)+"
-SOP_PATH = "P:\SCRIPTS\ALL Files"
+SOP_PATH = r"P:\SCRIPTS\ALL Files"
 
 
 def sop_search(search_regex, search_path):
@@ -24,7 +21,9 @@ def sop_search(search_regex, search_path):
             and Path.is_file(path)
         ):
             # After number in foldername
-            department = re.findall(r"((?<=\d{4}\w?\s?[-]\s?).*)", path.parts[3])[0].strip()
+            department = re.findall(r"((?<=\d{4}\w?\s?[-]\s?).*)", path.parts[3])[
+                0
+            ].strip()
             # 4 digits at start of string, 0 or 1 chars
             number = re.findall(r"^\d{4}\w?", path.name)[0]
             # Match everything after number
