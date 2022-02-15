@@ -1,7 +1,9 @@
 from pathlib import Path
 import re
+import datetime as dt
 from docx import Document
 import pandas as pd
+
 
 # Between regex and paths, pylint sees too many issues with this script
 # pylint: disable=anomalous-backslash-in-string
@@ -34,7 +36,7 @@ def sop_search(search_regex, search_path):
                 "Number": number,
                 "File Name/Title": title,
                 "Link to documents": hyperlink,
-                "Last Revision Date": last_revision_date,
+                "Last Revision Date": last_revision_date.strftime("%Y-%m-%d") if last_revision_date else None,
             }
 
             sops.append(row)
@@ -45,7 +47,7 @@ def date_finder(file_obj):
     """Searches a file obj for date"""
     # Matches dates like M/D/YY, MM/DD/YYYY, and some permutations
     date_re = r"((0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/]((19|20)\d{2}|\d{2}))"
-    last_revision_date = None
+    dates = []
 
     # I know, this nesting is a bit much right? 😳
     for table in file_obj.tables:
@@ -56,33 +58,35 @@ def date_finder(file_obj):
                         re.search(date_re, para.text)
                         and "supersedes" not in para.text.lower()
                     ):
-                        last_revision_date = re.findall(date_re, para.text)[0][0]
-    return last_revision_date
+                        date = re.findall(date_re, para.text)[0][0]
+                        # Format YY to YYYY and convert to datetime
+                        if len(date.split("/")[2]) == 2:
+                            date_split = date.split("/")
+                            date_split[2] = "20" + date_split[2]
+                            date = "/".join(date_split)
+                        date = dt.datetime.strptime(date, "%m/%d/%Y")
+                        dates.append(date)
+    return dates
 
 
 def last_revision_date_from_docx(docx_path):
     """Searches tables in a .docx file for the last_revision date"""
-    last_revision_date = None
+    found_dates = None
     try:
+        # Last revision date can be in document body or footer
         document = Document(docx_path)
-        last_revision_date = date_finder(document)
-        # If the tables in the body did not have a date
-        # Check the footer
-        if last_revision_date is None:
-            section = document.sections[0]
-            footer = section.footer
-            last_revision_date = date_finder(footer)
+        section = document.sections[0]
+        footer = section.footer
+        found_dates = [*date_finder(document), *date_finder(footer)]
 
     except IOError:
         print("Could not open file")
 
-    # Format YY to YYYY
-    if last_revision_date and len(last_revision_date.split("/")[2]) == 2:
-        date_split = last_revision_date.split("/")
-        date_split[2] = "20" + date_split[2]
-        last_revision_date = "/".join(date_split)
-
-    return last_revision_date
+    # Given the somewhat unpredictableness of where the last revision date is stored
+    # This script assumes the newest date in a table is the last revision date
+    # This appears to be a safe assumption given all the files I've checked
+    # But there is no gurantee
+    return max(found_dates) if found_dates else None
 
 
 def export_to_excel(files_dict, filename, sheetname):
@@ -110,8 +114,7 @@ def export_to_excel(files_dict, filename, sheetname):
             + 1
         )
         # TODO: *Properly* fix Link to Docs coming out too large
-        if max_len > 111:
-            max_len = 111
+        max_len = min(max_len, 111)
         worksheet.set_column(idx, idx, max_len)
     writer.save()
 
