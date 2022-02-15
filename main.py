@@ -1,3 +1,4 @@
+"""Searches SOP folder and outputs to an excel file"""
 from pathlib import Path
 import datetime as dt
 import regex as re
