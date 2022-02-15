@@ -1,9 +1,8 @@
 from pathlib import Path
-import re
+import regex as re
 import datetime as dt
 from docx import Document
 import pandas as pd
-
 
 # Between regex and paths, pylint sees too many issues with this script
 # pylint: disable=anomalous-backslash-in-string
@@ -24,10 +23,13 @@ def sop_search(search_regex, search_path):
             and "Archive" not in path.parts
             and Path.is_file(path)
         ):
-            department = path.parts[3].split("-")[1].strip()
+            # After number in foldername
+            department = re.findall(r"((?<=\d{4}\w?\s?[-]\s?).*)", path.parts[3])[0].strip()
             # 4 digits at start of string, 0 or 1 chars
             number = re.findall(r"^\d{4}\w?", path.name)[0]
-            title = path.stem.split("-")[1].strip()
+            # Match everything after number
+            title = re.findall(r"((?<=\d{4}\w?\s?[-]\s?).*)", path.stem)[0].strip()
+            # Create an excel useable hyperlink for path
             hyperlink = f'=HYPERLINK("{path}", "{path}")'
             last_revision_date = last_revision_date_from_docx(path)
 
@@ -36,7 +38,9 @@ def sop_search(search_regex, search_path):
                 "Number": number,
                 "File Name/Title": title,
                 "Link to documents": hyperlink,
-                "Last Revision Date": last_revision_date.strftime("%Y-%m-%d") if last_revision_date else None,
+                "Last Revision Date": last_revision_date.strftime("%Y-%m-%d")
+                if last_revision_date
+                else None,
             }
 
             sops.append(row)
@@ -54,10 +58,7 @@ def date_finder(file_obj):
         for row in table.rows:
             for cell in row.cells:
                 for para in cell.paragraphs:
-                    if (
-                        re.search(date_re, para.text)
-                        and "supersedes" not in para.text.lower()
-                    ):
+                    if re.search(date_re, para.text):
                         date = re.findall(date_re, para.text)[0][0]
                         # Format YY to YYYY and convert to datetime
                         if len(date.split("/")[2]) == 2:
