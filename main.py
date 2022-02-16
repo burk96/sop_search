@@ -38,7 +38,7 @@ def sop_search(search_regex, search_path):
                 "Number": number,
                 "File Name/Title": title,
                 "Link to documents": hyperlink,
-                "Last Revision Date": last_revision_date.strftime("%Y-%m-%d")
+                "Last Revision Date": last_revision_date.strftime("%m/%d/%Y")
                 if last_revision_date
                 else None,
             }
@@ -90,7 +90,7 @@ def last_revision_date_from_docx(docx_path):
     return max(found_dates) if found_dates else None
 
 
-def export_to_excel(files_dict, filename, sheetname):
+def export_to_excel(files_dict, filename, sheetname, max_column_length):
     """Exports a list of dictionaries to excel"""
     d_f = pd.DataFrame(files_dict)
 
@@ -115,9 +115,12 @@ def export_to_excel(files_dict, filename, sheetname):
             + 1
         )
         # TODO: *Properly* fix Link to Docs coming out too large
-        max_len = min(max_len, 111)
+        # Python or Pandas or someone cleans up the string when exported to Excel
+        # But internally, it's length is very long
+        # Not sure where to start debugging, so passing in a max length works for now
+        max_len = min(max_len, max_column_length)
         worksheet.set_column(idx, idx, max_len)
     writer.save()
 
 
-export_to_excel(sop_search(SOP_REGEX, SOP_PATH), "SOPS.xlsx", "SOPs")
+export_to_excel(sop_search(SOP_REGEX, SOP_PATH), "SOPS.xlsx", "SOPs", 111)
